@@ -32,3 +32,7 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Root folder is where I test each module while creating it, therefore I will add the directory to gitignore
+# in order to avoid pushing secrets and other data to Git
+/root
