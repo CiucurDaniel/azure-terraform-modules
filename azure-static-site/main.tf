@@ -5,7 +5,7 @@ resource "azurerm_static_site" "main" {
   sku_tier            = var.sku_tier
   sku_size            = var.sku_size
 
-  dyanmic "identity" {
+  dynamic "identity" {
     for_each = var.identity == null ? [] : ["identity"]
     content {
       type         = var.identity.type
