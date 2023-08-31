@@ -30,7 +30,7 @@ variable "sku_size" {
   default     = "Free"
 
   validation {
-    condition     = contains(["Free", "Standard"], var.sku_tier)
+    condition     = contains(["Free", "Standard"], var.sku_size)
     error_message = "sku_size must be Free or Standard"
   }
 }
