@@ -3,29 +3,31 @@ variable "name" {
   description = "(Required) Specifies the name of the Bastion Host. Changing this forces a new resource to be created."
 }
 
-variable "location" {
-  type        = string
-  description = "(Required) Specifies the supported Azure location where the resource exists. Changing this forces a new resource to be created. Review Azure Bastion Host FAQ for supported locations"
-}
-
 variable "resource_group_name" {
   type        = string
   description = "(Required) The name of the resource group in which to create the Bastion Host. Changing this forces a new resource to be created."
 }
 
+variable "location" {
+  type        = string
+  description = "(Required) Specifies the supported Azure location where the resource exists. Changing this forces a new resource to be created. Review Azure Bastion Host FAQ for supported locations"
+}
+
 variable "copy_paste_enabled" {
   type        = bool
-  description = "(Optional) Is Copy/Paste feature enabled for the Bastion Host."
+  description = "(Optional) Is Copy/Paste feature enabled for the Bastion Host. Defaults to true."
+  default     = true
 }
 
 variable "file_copy_enabled" {
   type        = bool
   description = "(Optional) Is File Copy feature enabled for the Bastion Host. "
+  default     = false
 }
 
 variable "sku" {
   type        = string
-  description = "(Optional) The SKU of the Bastion Host. Accepted values are Basic and Standard."
+  description = "(Optional) The SKU of the Bastion Host. Accepted values are Basic and Standard. Defaults to Basic."
   default     = "Basic"
 
   validation {
@@ -36,16 +38,11 @@ variable "sku" {
 
 variable "ip_configuration" {
   type = object({
-    name      = string
-    subnet_id = string
+    name                 = string
+    subnet_id            = string
+    public_ip_address_id = string
   })
-  description = "(Optional) The ip_configuration block."
-  default     = null
-
-  validation {
-    condition     = var.ip_configuration["name"] == "AzureBastionHost"
-    error_message = "The Subnet used for the Bastion Host must have the name AzureBastionSubnet!"
-  }
+  description = "The ip_configuration block."
 }
 
 variable "ip_connect_enabled" {
@@ -65,9 +62,16 @@ variable "scale_units" {
   }
 }
 
-variable "public_ip_address_id" {
-  type        = string
-  description = "(Required) Reference to a Public IP Address to associate with this Bastion Host. Changing this forces a new resource to be created."
+variable "shareable_link_enabled" {
+  type        = bool
+  description = "(Optional) Is Shareable Link feature enabled for the Bastion Host. Defaults to false."
+  default     = false
+}
+
+variable "tunneling_enabled" {
+  type        = bool
+  description = "(Optional) Is Tunneling feature enabled for the Bastion Host. Defaults to false."
+  default     = false
 }
 
 variable "tags" {
