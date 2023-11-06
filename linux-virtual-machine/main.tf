@@ -11,6 +11,7 @@ resource "azurerm_network_interface" "main" {
 
 resource "azurerm_linux_virtual_machine" "main" {
   admin_username        = var.admin_username
+  admin_password        = var.admin_password
   location              = var.location
   license_type          = var.license_type
   name                  = var.vm_name
