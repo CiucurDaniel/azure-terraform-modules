@@ -1,6 +1,27 @@
+locals {
+  # The default node_pool has a subnet 
+  # and each subsequent additional node_pool may have a different subnet, therefore we need to get a list
+  # with all of them in order to give the network contributor role for each subnet involved
+  potential_subnet_ids = flatten(concat([
+    for pool in var.node_pools : [
+      pool.vnet_subnet_id,
+      pool.pod_subnet_id
+    ]
+  ], [var.vnet_subnet_id]))
+  subnet_ids = toset([for id in local.potential_subnet_ids : id if id != null])
+}
+
 data "azurerm_resource_group" "cluster" {
   name = var.cluster_resource_group_name
 }
+
+data "azurerm_log_analytics_workspace" "main" {
+  count               = var.microsoft_defender_enabled ? 1 : 0
+  name                = var.log_analytics_workspace["name"]
+  resource_group_name = var.log_analytics_workspace["resource_group_name"]
+}
+
+# FIXME: We have option to provide azurerm_log_analytics_workspace, in the future the module can provide azurerm_log_analytics_solution resource as well
 
 resource "azurerm_kubernetes_cluster" "main" {
   name                 = var.cluster_name
@@ -107,6 +128,14 @@ resource "azurerm_kubernetes_cluster" "main" {
     # FEATURE: load balancer profile block could also be configured here in the future
   }
 
+  dynamic "microsoft_defender" {
+    for_each = var.microsoft_defender_enabled ? ["microsoft_defender"] : []
+
+    content {
+      log_analytics_workspace_id = data.azurerm_log_analytics_workspace.main.0.id
+    }
+  }
+
   tags = var.tags
 }
 
@@ -199,17 +228,59 @@ resource "azurerm_kubernetes_cluster_node_pool" "node_pool" {
   }
 }
 
-# TODO: Newotk Contributor role 
+# TODO: Because of the Kubenet plugin we have a route table created in the node resource group.
+# on that rt we also have to entries toDaimler and toFirewall how can we do it from Terraform?
+
+
 # The AKS cluster identity has the Contributor role on the AKS second resource group (MC_myResourceGroup_myAKSCluster_eastus)
 # However when using a custom VNET, the AKS cluster identity needs the Network Contributor role on the VNET subnets
 # used by the system node pool and by any additional node pools.
 # https://learn.microsoft.com/en-us/azure/aks/configure-kubenet#prerequisites
 # https://learn.microsoft.com/en-us/azure/aks/configure-azure-cni#prerequisites
 # https://github.com/Azure/terraform-azurerm-aks/issues/178
-# resource "azurerm_role_assignment" "network_contributor" {
-#   for_each = var.create_role_assignment_network_contributor ? local.subnet_ids : []
+resource "azurerm_role_assignment" "network_contributor" {
+  for_each = var.create_role_assignment_network_contributor ? local.subnet_ids : []
 
-#   principal_id         = azurerm_kubernetes_cluster.main.identity[0].principal_id
-#   scope                = each.value
-#   role_definition_name = "Network Contributor"
-# }
+  principal_id         = azurerm_kubernetes_cluster.main.identity[0].principal_id
+  scope                = each.value
+  role_definition_name = "Network Contributor"
+}
+
+# See more: https://learn.microsoft.com/en-us/azure/private-link/rbac-permissions#private-link-service
+resource "azurerm_role_definition" "pls" {
+  count = var.create_role_assignment_private_link_service ? 1 : 0
+
+  name  = "aks-private-link-service-role"
+  scope = data.azurerm_resource_group.cluster.id
+
+  permissions {
+    actions = [
+      "Microsoft.Resources/deployments/*",
+      "Microsoft.Resources/subscriptions/resourceGroups/read",
+      "Microsoft.Network/virtualNetworks/read",
+      "Microsoft.Network/virtualNetworks/subnets/read",
+      "Microsoft.Network/virtualNetworks/subnets/write",
+      "Microsoft.Network/virtualNetworks/subnets/join/action",
+      "Microsoft.Network/privateEndpoints/read",
+      "Microsoft.Network/privateEndpoints/write",
+      "Microsoft.Network/locations/availablePrivateEndpointTypes/read"
+    ]
+    not_actions = []
+  }
+
+  assignable_scopes = [
+    data.azurerm_resource_group.cluster.id,
+  ]
+}
+
+resource "azurerm_role_assignment" "pls" {
+  count = var.create_role_assignment_private_link_service ? 1 : 0
+
+  scope              = data.azurerm_resource_group.cluster.id
+  role_definition_id = try(azurerm_role_definition.pls[count.index].pls.role_definition_id)
+  principal_id       = azurerm_kubernetes_cluster.main.identity[0].principal_id
+
+  # The above reads as grant principal_id () which is the system identity of the cluster
+  # the role with id (role_definiton_id) over the scope resource group of the cluster
+  # IMPORTANT: in this context it means you can only deploy PLS in the resource group of the cluster and the node resource group which works by default without this role assignment
+}

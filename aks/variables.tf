@@ -266,6 +266,22 @@ variable "load_balancer_sku" {
   }
 }
 
+variable "microsoft_defender_enabled" {
+  type        = bool
+  description = "(Optional) Is Microsoft Defender on the cluster enabled? `var.log_analytics_workspace` to be set as well."
+  default     = false
+  nullable    = false
+}
+
+variable "log_analytics_workspace" {
+  type = object({
+    name                = string
+    resource_group_name = string
+  })
+  default     = null
+  description = "Gives the name and resource group of an existing log analytics workspace. For more: https://docs.microsoft.com/en-us/azure/azure-monitor/containers/container-insights-onboard"
+}
+
 # Additional node pools
 
 variable "node_pools" {
@@ -368,11 +384,16 @@ variable "node_pools" {
   nullable    = false
 }
 
-# TODO: Newotk Contributor role
-# variable "create_role_assignment_network_contributor" {
-#   type        = bool
-#   default     = false
-#   description = "Create a role assignment for the AKS Service Principal to be a Network Contributor on the subnets used for the AKS Cluster"
-#   nullable    = false
-# }
+variable "create_role_assignment_network_contributor" {
+  type        = bool
+  default     = false
+  description = "Create a role assignment for the AKS Service Principal to be a Network Contributor on the subnets used for the AKS Cluster"
+  nullable    = false
+}
 
+variable "create_role_assignment_private_link_service" {
+  type        = bool
+  default     = false
+  description = "Create a role assignment for the AKS Service Principal to be able to create Private link service by using annotations on LoadBalancer service"
+  nullable    = false
+}
